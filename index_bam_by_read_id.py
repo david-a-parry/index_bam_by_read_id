@@ -12,6 +12,8 @@ class IndexByReadId(object):
         by Read ID
     '''
 
+    slots = ['bam', 'idx', 'k_idx', '_cache', 'bamfile', 'index_file']
+
     def __init__(self, bam, index=None):
         ''' 
             Initialization requires a bam and optionally a filename

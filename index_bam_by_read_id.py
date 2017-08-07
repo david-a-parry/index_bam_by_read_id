@@ -78,7 +78,7 @@ class IndexByReadId(object):
                 del stack_tops[i]
                 mergers[i].close()
                 os.remove(mergers[i].filename.decode())
-                del mergers[i]  # __del__ method of file_opener should delete the file
+                del mergers[i] 
         sink.close()
 
     def _merge_write(self, recs, outfile, header, n):

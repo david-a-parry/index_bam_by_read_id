@@ -127,8 +127,7 @@ class IndexByReadId(object):
         '''
         if self.idx is None:
             self.read_index()
-        reads = self._get_matching_reads(rid)
-        return reads
+        return self._get_matching_reads(rid)
 
     def _get_matching_reads(self, rid):
         if rid < self.k_idx[0]:
@@ -220,9 +219,6 @@ class IndexByReadId(object):
                break 
         return reads
         
-    def _read_from_index(self, i):
-        pass
-
     def _get_nearest_indices(self, rid):
         '''
             Binary search of indexed read names (we have already checked

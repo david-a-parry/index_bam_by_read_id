@@ -2,10 +2,8 @@
 import pysam
 import pickle
 from collections import OrderedDict
-import re
 import os
 
-_split_qname = re.compile(r'[\.\:_]')
 _by_qname = lambda x: x.query_name
 
 class IndexByReadId(object):

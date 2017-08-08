@@ -87,6 +87,9 @@ class IndexByReadId(object):
         if self.bamfile.is_open():
             self.bamfile.close()
         self.bamfile = pysam.AlignmentFile(self.bam, 'rb')
+        self.index_file = self.bam + '.ibbr'
+        self.idx = None
+        self.k_idx = None
 
     def _merge_write(self, recs, outfile, header, n):
         recs.sort(key=_by_qname)
@@ -130,7 +133,8 @@ class IndexByReadId(object):
         '''
             Retrieve reads with matching ID. Returns a list of 
             pysam.AlignedSegment objects (or an empty list if no reads
-            are found). The index must exist.
+            are found). The index must have been created before running
+            this function.
         '''
         if self.idx is None:
             self.read_index()

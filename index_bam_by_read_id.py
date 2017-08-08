@@ -12,6 +12,8 @@ class IndexByReadId(object):
         by Read ID
     '''
 
+    __slots__ = ['bam', 'idx', 'k_idx', '_cache', 'bamfile', 'index_file']
+
     def __init__(self, bam, index=None):
         ''' 
             Initialization requires a bam and optionally a filename
@@ -79,7 +81,7 @@ class IndexByReadId(object):
                 del stack_tops[i]
                 mergers[i].close()
                 os.remove(mergers[i].filename.decode())
-                del mergers[i]  # __del__ method of file_opener should delete the file
+                del mergers[i] 
         sink.close()
         self.bam = outfile
         if self.bamfile.is_open():
@@ -132,8 +134,7 @@ class IndexByReadId(object):
         '''
         if self.idx is None:
             self.read_index()
-        reads = self._get_matching_reads(rid)
-        return reads
+        return self._get_matching_reads(rid)
 
     def _get_matching_reads(self, rid):
         if rid < self.k_idx[0]:
@@ -225,9 +226,6 @@ class IndexByReadId(object):
                break 
         return reads
         
-    def _read_from_index(self, i):
-        pass
-
     def _get_nearest_indices(self, rid):
         '''
             Binary search of indexed read names (we have already checked

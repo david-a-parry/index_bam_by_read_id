@@ -106,6 +106,7 @@ class IndexByReadId(object):
         idx = OrderedDict()
         n = 0
         prev_qname = ''
+        prev_pos = None
         with pysam.AlignmentFile( self.bam, "rb" ) as b_fh:
             p = b_fh.tell()
             for r in b_fh.fetch(until_eof=True):
@@ -115,10 +116,11 @@ class IndexByReadId(object):
                 if n % chunk_size == 0:
                     idx[r.qname] = p
                 n += 1
-                p = b_fh.tell()
+                prev_pos = p
                 prev_qname = r.qname
+                p = b_fh.tell()
         if prev_qname:
-            idx[prev_qname] = p
+            idx[prev_qname] = prev_pos
         pfh = open(self.index_file, 'wb')
         pickle.dump(idx, pfh)
         pickle.dump(n, pfh)
@@ -157,27 +159,36 @@ class IndexByReadId(object):
         matches = []
         if l == u: #exact match
             #look at reads before matching index
-            first = self.k_idx[l-1]
-            last = self.k_idx[l]
-            self._set_cache(first, last)
-            for i in range(len(self._cache)-2, -1, -1):
-                if self._cache[i].query_name == rid:
-                    matches.append(self._cache[i])
-                else:
-                    break
+            if l > 0:
+                first = self.k_idx[l-1]
+                last = self.k_idx[l]
+                self._set_cache(first, last)
+                for i in range(len(self._cache)-2, -1, -1):
+                    if self._cache[i].query_name == rid:
+                        matches.append(self._cache[i])
+                    else:
+                        break
+            #get read at index 
+            matches.append(self._read_at_k_idx(self.k_idx[l]))
             #look at reads including and after matching index
-            first = self.k_idx[l]
-            last = self.k_idx[l+1]
-            self._set_cache(first, last)
-            for i in range(0, len(self._cache)):
-                if self._cache[i].query_name == rid:
-                    matches.append(self._cache[i])
-                else:
-                    break
+            if l < len(self.k_idx) - 1:
+                first = self.k_idx[l]
+                last = self.k_idx[l+1]
+                self._set_cache(first, last)
+                for i in range(1, len(self._cache)):
+                    if self._cache[i].query_name == rid:
+                        matches.append(self._cache[i])
+                    else:
+                        break
         else: #match is somewhere inbetween self.k_idx[l] and self.k_idx[u]
             matches = self._search_reads(rid, l, u)
         return matches
 
+    def _read_at_k_idx(self, k):
+        i = self.idx[k]
+        self.bamfile.seek(i)
+        return next(self.bamfile)
+        
     def _search_reads(self, rid, l, u):
         first = self.k_idx[l]
         last = self.k_idx[u]

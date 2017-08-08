@@ -85,6 +85,15 @@ def test_find_targets():
     hits = ibbr2.get_reads_by_id( #search for non-existent read
                         "NZ_GG703879.1_967999_968061_0_1_0_0_4:0:0_1:0:0_62bb")
     assert_equal(len(hits), 0)
+    #search first and last records
+    first_last = ("SRR043348.1017172", "SRR043396.9722121")
+    for t in first_last:
+        hits = ibbr.get_reads_by_id(t)
+        n = 0
+        for h in hits:
+            n += 1
+            assert_equal(t, h.query_name)
+        assert_equal(n, 2)
 
 def test_sort_creates_index():
     if os.path.exists(_sidx):
@@ -101,3 +110,4 @@ def test_sort_creates_index():
         n += 1
         assert_equal(t, h.query_name)
     assert_equal(n, 2)
+

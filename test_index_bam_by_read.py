@@ -33,7 +33,6 @@ def test_create_index():
     ibbr.create_index(chunk_size=100)
     assert_true(os.path.exists(_sidx))
     ibbr2 = IndexByReadId(_s2)
-    #import pdb; pdb.set_trace() 
     ibbr2.create_index()
     assert_true(os.path.exists(_s2idx))
     
@@ -41,7 +40,9 @@ def test_read_index():
     assert_true(os.path.exists(_sidx))
     ibbr = IndexByReadId(_s)
     idx = ibbr.read_index()
-    isinstance(idx, OrderedDict)
+    #import pdb; pdb.set_trace() 
+    assert_true(isinstance(ibbr.idx, OrderedDict))
+    assert_equal(ibbr.n_records, 1010)
     
 def test_find_targets():
     ibbr = IndexByReadId(_s)

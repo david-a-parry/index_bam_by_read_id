@@ -12,7 +12,8 @@ class IndexByReadId(object):
         by Read ID
     '''
 
-    __slots__ = ['bam', 'idx', 'k_idx', '_cache', 'bamfile', 'index_file']
+    __slots__ = ['bam', 'idx', 'k_idx', '_cache', 'bamfile', 'index_file',
+                 'n_records']
 
     def __init__(self, bam, index=None):
         ''' 
@@ -120,12 +121,14 @@ class IndexByReadId(object):
             idx[prev_qname] = p
         pfh = open(self.index_file, 'wb')
         pickle.dump(idx, pfh)
+        pickle.dump(n, pfh)
         pfh.close()
 
     def read_index(self):
         ''' Read an index file created using the create_index function.'''
         pfh = open(self.index_file, 'rb')
         self.idx = pickle.load(pfh)
+        self.n_records = pickle.load(pfh)
         self.k_idx = list(self.idx.keys())
         pfh.close()
 

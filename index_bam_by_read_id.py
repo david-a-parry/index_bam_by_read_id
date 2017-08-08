@@ -35,6 +35,9 @@ class IndexByReadId(object):
             If outfile is not given, output will be the name of self.bam
             without the extension + '_rid_sorted.bam' (i.e. in.bam 
             becomes in_rid_sorted.bam).
+    
+            After sorting, self.bam and self.bamfile will represent the
+            sorted output file.
         '''
         if outfile is None:
             (f, ext) = os.path.splitext(self.bam)
@@ -78,6 +81,10 @@ class IndexByReadId(object):
                 os.remove(mergers[i].filename.decode())
                 del mergers[i]  # __del__ method of file_opener should delete the file
         sink.close()
+        self.bam = outfile
+        if self.bamfile.is_open():
+            self.bamfile.close()
+        self.bamfile = pysam.AlignmentFile(self.bam, 'rb')
 
     def _merge_write(self, recs, outfile, header, n):
         recs.sort(key=_by_qname)

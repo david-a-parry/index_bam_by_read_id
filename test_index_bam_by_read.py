@@ -84,3 +84,19 @@ def test_find_targets():
     hits = ibbr2.get_reads_by_id( #search for non-existent read
                         "NZ_GG703879.1_967999_968061_0_1_0_0_4:0:0_1:0:0_62bb")
     assert_equal(len(hits), 0)
+
+def test_sort_creates_index():
+    if os.path.exists(_sidx):
+        os.remove(_sidx)
+    ibbr = IndexByReadId(_f)
+    ibbr.sort_bam(outfile=_s, batch_size=100)
+    assert_equal(ibbr.bam, _s)
+    assert_equal(ibbr.index_file, _sidx)
+    ibbr.create_index()
+    t = "SRR043372.11318637"
+    hits = ibbr.get_reads_by_id(t)
+    n = 0
+    for h in hits:
+        n += 1
+        assert_equal(t, h.query_name)
+    assert_equal(n, 2)

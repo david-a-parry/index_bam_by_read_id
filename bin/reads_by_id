@@ -1,0 +1,123 @@
+#!/usr/bin/env python
+
+import sys
+import pysam
+import argparse
+from index_bam_by_read_id import IndexByReadId
+
+def get_parser():
+    '''Get ArgumentParser'''
+    parser = argparse.ArgumentParser(
+                  description='Retrieve alignments by read ID.',)
+    parser.add_argument("CMD", metavar="COMMAND", 
+                        help='''command to run. Can be one of 'sort', 'index' or 
+                            'get'.''')
+    parser.add_argument("BAM", metavar="BAM", help="input BAM file")
+    get = parser.add_argument_group('get arguments')
+    index = parser.add_argument_group('index arguments')
+    sort = parser.add_argument_group('sort arguments')
+    get.add_argument("-r", "--read_ids", nargs='+',
+                        help='''ID(s) of reads to retrieve.
+                             ''')
+    get.add_argument("-f", "--read_file",
+                        help='''File containing ID(s) of reads to retrieve, one
+                                per line. Only the first non-whitespace part of 
+                                each line is read.''')
+    get.add_argument("-o", "--output", metavar="OUTPUT",
+                        help='''Output filename. Default is to print to STDOUT.
+                             ''')
+    parser.add_argument("-F", "--out_format", metavar="FMT",
+                        help='''Output format for 'get' or 'sort' commands. May 
+                                be either 'BAM', 'CRAM' or 'SAM'. Default is 
+                                SAM if outputting to STDOUT and otherwise 
+                                chosen by the extenstion of the output file. 
+                                Note that CRAM format files can not be indexed 
+                                by this program.''')
+    parser.add_argument("-i", "--index",  metavar="INDEX", 
+                        help='''index filename. Default=<BAM>.ibbr''')
+    index.add_argument("-x", "--index_chunks", metavar="N", default=50000,
+                        help='''Create an index entry every N reads. Smaller
+                                numbers result in bigger index but potentially
+                                faster retrieval time. Smaller numbers will 
+                                result in the index taking up more RAM but will
+                                reduce the amount of RAM needed to hold batches
+                                of variants. Only used with the 'index' 
+                                command. Default=50000''')
+    sort.add_argument("-b", "--batch_size", metavar="N", default=2000000,
+                        help='''Sort records in batch sizes of N reads. Only 
+                                used with 'sort' command. Default=2000000''')
+    sort.add_argument("-s", "--sorted_output", metavar="BAM",
+                        help='''Filename for sorted BAM output. Defaults to the
+                                input filename without extension + 
+                                '_rid_sorted.bam' (i.e. input.bam becomes
+                                input_rid_sorted.bam).''')
+    return parser
+
+def run(CMD, BAM, read_ids=None, read_file=None, index=None, output=None, 
+        out_format=None, sorted_output=None, index_chunks=50000, 
+        batch_size=2000000, ):
+    ''' Dispatch appropriate command.'''
+    ibbr = IndexByReadId(BAM, index=index)
+    if CMD == 'get':
+        get_records(ibbr, read_ids, read_file, output, out_format)
+    elif CMD == 'sort':
+        ibbr.sort_bam(outfile=sorted_output, out_format=out_format,
+                      batch_size=batch_size)
+    elif CMD== 'index':
+        ibbr.create_index(chunk_size=index_chunks)
+    else:
+        sys.exit("ERROR: Unrecognised command '{}'".format(command))
+
+def get_records(ibbr, read_ids=None, read_file=None, output=None, 
+                out_format=None):
+    if read_ids is None and read_file is None:
+        sys.exit("Either -r/--read_ids or -f/--read_file options are required"+
+                 " with 'get' command.")
+    bamout = _get_output(output, out_format, ibbr.bamfile)
+    if read_ids is None:
+        read_ids = set()
+    else:
+        read_ids = set(read_ids)
+    if read_file:
+        read_ids.update(_reads_from_file(read_file))
+    for r in read_ids:
+        hits = ibbr.get_reads_by_id(r)
+        for h in hits:
+            bamout.write(h)
+    
+
+def _get_output(output, fmt, template):
+    wbmode = 'wb'
+    if fmt is not None:
+        if fmt == 'SAM':
+            wbmode = 'w'
+        elif fmt == 'CRAM':
+            wbmode = 'wc'
+        elif fmt != 'BAM':
+            sys.exit("ERROR: Unrecognized -F/--out_format '{}'".format(fmt))
+    if output is not None:
+        if fmt is None:
+            if output.endswith(('.sam', '.SAM')):
+                wbmode = 'w'
+            elif output.endswith(('.cram', '.CRAM')):
+                wbmode = 'wc'
+        return pysam.AlignmentFile(output, wbmode, template=template)
+    else:
+        if fmt is None:
+            wbmode = 'w'
+        return  pysam.AlignmentFile('-', wbmode, template=template)
+       
+def _reads_from_file(f):
+    rids = set()
+    with open(f, 'rt') as fh:
+        for l in fh:
+            r = l.split()[0]
+            if r:
+                rids.add(r)
+    return rids
+
+if __name__ == '__main__':
+    parser = get_parser()
+    args = parser.parse_args()
+    run(**vars(args))
+ 

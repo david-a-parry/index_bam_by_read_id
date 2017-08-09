@@ -12,7 +12,8 @@ class IndexByReadId(object):
         by Read ID
     '''
 
-    __slots__ = ['bam', 'idx', 'k_idx', '_cache', 'bamfile', 'index_file']
+    __slots__ = ['bam', 'idx', 'k_idx', '_cache', 'bamfile', 'index_file',
+                 'n_records']
 
     def __init__(self, bam, index=None):
         ''' 
@@ -27,9 +28,26 @@ class IndexByReadId(object):
         self.idx = None
         self.k_idx = None
         self._cache = []
-        self.bamfile = pysam.AlignmentFile(bam, 'rb')
-        
-    def sort_bam(self, outfile=None, batch_size=2000000):
+        self.bamfile = pysam.AlignmentFile(bam, self._get_rmode(bam))
+
+    def _get_rmode(self, bam):
+        bmode = 'rb'
+        if bam.endswith(('.sam', '.SAM')):
+            bmode = 'r'
+        elif bam.endswith(('.cram', '.CRAM')):
+            bmode = 'rc'
+        return bmode
+
+    def _get_wmode(self, bam):
+        wmode = 'wb'
+        if bam.endswith(('.sam', '.SAM')):
+            wmode = 'w'
+        elif bam.endswith(('.cram', '.CRAM')):
+            wmode = 'wc'
+        return wmode
+ 
+    def sort_bam(self, outfile=None, out_format=None, in_format=None, 
+                 batch_size=2000000):
         ''' 
             Samtools sort does not appear to guarantee ascibetical or
             numeric (including hexidecimal) order of field in read 
@@ -37,32 +55,54 @@ class IndexByReadId(object):
             If outfile is not given, output will be the name of self.bam
             without the extension + '_rid_sorted.bam' (i.e. in.bam 
             becomes in_rid_sorted.bam).
+    
+            After sorting, self.bam and self.bamfile will represent the
+            sorted output file.
         '''
+        ext = '.bam'
+        wmode = 'wb'
+        rmode = 'rb'
+        if out_format is not None:
+            if out_format == 'CRAM':
+                ext = '.cram'
+                wmode = 'wc'
+            elif out_format == 'SAM':
+                ext = '.sam'
+                wmode = 'w'
+            elif out_format != 'BAM':
+                raise OutFormatError("Unrecognised output file format '{}'"
+                                     .format(out_format))
+        elif outfile is not None:
+            wmode = self._get_wmode(outfile)
         if outfile is None:
             (f, ext) = os.path.splitext(self.bam)
-            outfile = f + '_rid_sorted.bam'
+            outfile = f + '_rid_sorted' + ext
         header = self.bamfile.header
         if 'HD' not in header:
             header['HD'] = dict()
         header['HD']['SO'] = 'queryname'
-        sink = pysam.AlignmentFile(outfile, 'wb', header=header)
+        sink = pysam.AlignmentFile(outfile, wmode, header=header)
         mergers = []
-        source = pysam.AlignmentFile(self.bam, 'rb')
+        source = pysam.AlignmentFile(self.bam, rmode)
         n = 0
         m = 0 
         recs = []
+        if wmode == 'wc':
+            m_rmode = 'rc'
+        else:
+            m_rmode = 'rb'
         for r in source.fetch(until_eof=True):
             n += 1
             recs.append(r)
             if n % batch_size == 0:
-                merge_fn = self._merge_write(recs, outfile, header, m)
+                merge_fn = self._merge_write(recs, outfile, wmode, header, m)
                 recs[:] = []
-                mergers.append(pysam.AlignmentFile(merge_fn, 'rb'))
+                mergers.append(pysam.AlignmentFile(merge_fn, m_rmode))
                 m += 1
         if recs:
-            merge_fn = self._merge_write(recs, outfile, header, m)
+            merge_fn = self._merge_write(recs, outfile, wmode, header, m)
             recs[:] = []
-            mergers.append(pysam.AlignmentFile(merge_fn, 'rb'))
+            mergers.append(pysam.AlignmentFile(merge_fn, m_rmode))
         source.close()
         # merge onto sink
         stack_tops = [next(f) for f in mergers]
@@ -80,11 +120,23 @@ class IndexByReadId(object):
                 os.remove(mergers[i].filename.decode())
                 del mergers[i] 
         sink.close()
+        self.bam = outfile
+        if self.bamfile.is_open():
+            self.bamfile.close()
+        self.bamfile = pysam.AlignmentFile(self.bam, rmode)
+        self.index_file = self.bam + '.ibbr'
+        self.idx = None
+        self.k_idx = None
 
-    def _merge_write(self, recs, outfile, header, n):
+    def _merge_write(self, recs, outfile, mode, header, n):
         recs.sort(key=_by_qname)
-        merge_fn = outfile + str.format(".{:05d}.ibbr.tmp.bam", n)
-        merge_bam = pysam.AlignmentFile(merge_fn, 'wb', header=header)
+        if mode == 'wc':
+            ext = 'cram'
+        else:
+            mode = 'wb'
+            ext = 'bam'
+        merge_fn = outfile + str.format(".{:05d}.ibbr.tmp.{}", n, ext)
+        merge_bam = pysam.AlignmentFile(merge_fn, mode, header=header)
         for mrec in recs:
             merge_bam.write(mrec)
         merge_bam.close()
@@ -95,27 +147,36 @@ class IndexByReadId(object):
         idx = OrderedDict()
         n = 0
         prev_qname = ''
-        with pysam.AlignmentFile( self.bam, "rb" ) as b_fh:
+        prev_pos = None
+        rmode = self._get_rmode(self.bam)
+        if rmode == 'rc':
+            raise NotImplementedError("Indexing and seeking of CRAM files is" +
+                                      " not implemented (seek not implemented"+
+                                      " by pysam)")
+        with pysam.AlignmentFile( self.bam, rmode) as b_fh:
             p = b_fh.tell()
             for r in b_fh.fetch(until_eof=True):
-                if prev_qname and r.qname < prev_qname:
+                if prev_qname and r.query_name < prev_qname:
                     raise UnsortedBamError("Input ({}) is not sorted by Read ID"
                                     .format(self.bam))
                 if n % chunk_size == 0:
-                    idx[r.qname] = p
+                    idx[r.query_name] = p
                 n += 1
+                prev_pos = p
+                prev_qname = r.query_name
                 p = b_fh.tell()
-                prev_qname = r.qname
         if prev_qname:
-            idx[prev_qname] = p
+            idx[prev_qname] = prev_pos
         pfh = open(self.index_file, 'wb')
         pickle.dump(idx, pfh)
+        pickle.dump(n, pfh)
         pfh.close()
 
     def read_index(self):
         ''' Read an index file created using the create_index function.'''
         pfh = open(self.index_file, 'rb')
         self.idx = pickle.load(pfh)
+        self.n_records = pickle.load(pfh)
         self.k_idx = list(self.idx.keys())
         pfh.close()
 
@@ -123,7 +184,8 @@ class IndexByReadId(object):
         '''
             Retrieve reads with matching ID. Returns a list of 
             pysam.AlignedSegment objects (or an empty list if no reads
-            are found). The index must exist.
+            are found). The index must have been created before running
+            this function.
         '''
         if self.idx is None:
             self.read_index()
@@ -143,27 +205,36 @@ class IndexByReadId(object):
         matches = []
         if l == u: #exact match
             #look at reads before matching index
-            first = self.k_idx[l-1]
-            last = self.k_idx[l]
-            self._set_cache(first, last)
-            for i in range(len(self._cache)-2, -1, -1):
-                if self._cache[i].query_name == rid:
-                    matches.append(self._cache[i])
-                else:
-                    break
+            if l > 0:
+                first = self.k_idx[l-1]
+                last = self.k_idx[l]
+                self._set_cache(first, last)
+                for i in range(len(self._cache)-2, -1, -1):
+                    if self._cache[i].query_name == rid:
+                        matches.append(self._cache[i])
+                    else:
+                        break
+            #get read at index 
+            matches.append(self._read_at_k_idx(self.k_idx[l]))
             #look at reads including and after matching index
-            first = self.k_idx[l]
-            last = self.k_idx[l+1]
-            self._set_cache(first, last)
-            for i in range(0, len(self._cache)):
-                if self._cache[i].query_name == rid:
-                    matches.append(self._cache[i])
-                else:
-                    break
+            if l < len(self.k_idx) - 1:
+                first = self.k_idx[l]
+                last = self.k_idx[l+1]
+                self._set_cache(first, last)
+                for i in range(1, len(self._cache)):
+                    if self._cache[i].query_name == rid:
+                        matches.append(self._cache[i])
+                    else:
+                        break
         else: #match is somewhere inbetween self.k_idx[l] and self.k_idx[u]
             matches = self._search_reads(rid, l, u)
         return matches
 
+    def _read_at_k_idx(self, k):
+        i = self.idx[k]
+        self.bamfile.seek(i)
+        return next(self.bamfile)
+        
     def _search_reads(self, rid, l, u):
         first = self.k_idx[l]
         last = self.k_idx[u]
@@ -244,6 +315,9 @@ class IndexByReadId(object):
         #not found (shouldn't happen after check in _get_matching_reads)
         return (None, None) 
 
+
+class OutFormatError(Exception):
+    pass
 
 class UnsortedBamError(Exception):
     pass

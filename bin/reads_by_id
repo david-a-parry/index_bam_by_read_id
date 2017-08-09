@@ -111,9 +111,9 @@ def _reads_from_file(f):
     rids = set()
     with open(f, 'rt') as fh:
         for l in fh:
-            r = l.split()[0]
-            if r:
-                rids.add(r)
+            s = l.split()
+            if s:
+                rids.add(s[0])
     return rids
 
 if __name__ == '__main__':

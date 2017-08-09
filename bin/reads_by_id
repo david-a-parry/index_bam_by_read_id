@@ -35,7 +35,8 @@ def get_parser():
                                 by this program.''')
     parser.add_argument("-i", "--index",  metavar="INDEX", 
                         help='''index filename. Default=<BAM>.ibbr''')
-    index.add_argument("-x", "--index_chunks", metavar="N", default=50000,
+    index.add_argument("-x", "--index_chunks", metavar="N", type=int, 
+                        default=50000,
                         help='''Create an index entry every N reads. Smaller
                                 numbers result in bigger index but potentially
                                 faster retrieval time. Smaller numbers will 
@@ -43,7 +44,8 @@ def get_parser():
                                 reduce the amount of RAM needed to hold batches
                                 of variants. Only used with the 'index' 
                                 command. Default=50000''')
-    sort.add_argument("-b", "--batch_size", metavar="N", default=2000000,
+    sort.add_argument("-b", "--batch_size", metavar="N", type=int,
+                        default=2000000,
                         help='''Sort records in batch sizes of N reads. Only 
                                 used with 'sort' command. Default=2000000''')
     sort.add_argument("-s", "--sorted_output", metavar="BAM",

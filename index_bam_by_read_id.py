@@ -110,14 +110,14 @@ class IndexByReadId(object):
         with pysam.AlignmentFile( self.bam, "rb" ) as b_fh:
             p = b_fh.tell()
             for r in b_fh.fetch(until_eof=True):
-                if prev_qname and r.qname < prev_qname:
+                if prev_qname and r.query_name < prev_qname:
                     raise UnsortedBamError("Input ({}) is not sorted by Read ID"
                                     .format(self.bam))
                 if n % chunk_size == 0:
-                    idx[r.qname] = p
+                    idx[r.query_name] = p
                 n += 1
                 prev_pos = p
-                prev_qname = r.qname
+                prev_qname = r.query_name
                 p = b_fh.tell()
         if prev_qname:
             idx[prev_qname] = prev_pos

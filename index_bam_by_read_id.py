@@ -28,9 +28,26 @@ class IndexByReadId(object):
         self.idx = None
         self.k_idx = None
         self._cache = []
-        self.bamfile = pysam.AlignmentFile(bam, 'rb')
-        
-    def sort_bam(self, outfile=None, batch_size=2000000):
+        self.bamfile = pysam.AlignmentFile(bam, self._get_rmode(bam))
+
+    def _get_rmode(self, bam):
+        bmode = 'rb'
+        if bam.endswith(('.sam', '.SAM')):
+            bmode = 'r'
+        elif bam.endswith(('.cram', '.CRAM')):
+            bmode = 'rc'
+        return bmode
+
+    def _get_wmode(self, bam):
+        wmode = 'wb'
+        if bam.endswith(('.sam', '.SAM')):
+            wmode = 'w'
+        elif bam.endswith(('.cram', '.CRAM')):
+            wmode = 'wc'
+        return wmode
+ 
+    def sort_bam(self, outfile=None, out_format=None, in_format=None, 
+                 batch_size=2000000):
         ''' 
             Samtools sort does not appear to guarantee ascibetical or
             numeric (including hexidecimal) order of field in read 
@@ -42,31 +59,50 @@ class IndexByReadId(object):
             After sorting, self.bam and self.bamfile will represent the
             sorted output file.
         '''
+        ext = '.bam'
+        wmode = 'wb'
+        rmode = 'rb'
+        if out_format is not None:
+            if out_format == 'CRAM':
+                ext = '.cram'
+                wmode = 'wc'
+            elif out_format == 'SAM':
+                ext = '.sam'
+                wmode = 'w'
+            elif out_format != 'BAM':
+                raise OutFormatError("Unrecognised output file format '{}'"
+                                     .format(out_format))
+        elif outfile is not None:
+            wmode = self._get_wmode(outfile)
         if outfile is None:
             (f, ext) = os.path.splitext(self.bam)
-            outfile = f + '_rid_sorted.bam'
+            outfile = f + '_rid_sorted' + ext
         header = self.bamfile.header
         if 'HD' not in header:
             header['HD'] = dict()
         header['HD']['SO'] = 'queryname'
-        sink = pysam.AlignmentFile(outfile, 'wb', header=header)
+        sink = pysam.AlignmentFile(outfile, wmode, header=header)
         mergers = []
-        source = pysam.AlignmentFile(self.bam, 'rb')
+        source = pysam.AlignmentFile(self.bam, rmode)
         n = 0
         m = 0 
         recs = []
+        if wmode == 'wc':
+            m_rmode = 'rc'
+        else:
+            m_rmode = 'rb'
         for r in source.fetch(until_eof=True):
             n += 1
             recs.append(r)
             if n % batch_size == 0:
-                merge_fn = self._merge_write(recs, outfile, header, m)
+                merge_fn = self._merge_write(recs, outfile, wmode, header, m)
                 recs[:] = []
-                mergers.append(pysam.AlignmentFile(merge_fn, 'rb'))
+                mergers.append(pysam.AlignmentFile(merge_fn, m_rmode))
                 m += 1
         if recs:
-            merge_fn = self._merge_write(recs, outfile, header, m)
+            merge_fn = self._merge_write(recs, outfile, wmode, header, m)
             recs[:] = []
-            mergers.append(pysam.AlignmentFile(merge_fn, 'rb'))
+            mergers.append(pysam.AlignmentFile(merge_fn, m_rmode))
         source.close()
         # merge onto sink
         stack_tops = [next(f) for f in mergers]
@@ -87,15 +123,20 @@ class IndexByReadId(object):
         self.bam = outfile
         if self.bamfile.is_open():
             self.bamfile.close()
-        self.bamfile = pysam.AlignmentFile(self.bam, 'rb')
+        self.bamfile = pysam.AlignmentFile(self.bam, rmode)
         self.index_file = self.bam + '.ibbr'
         self.idx = None
         self.k_idx = None
 
-    def _merge_write(self, recs, outfile, header, n):
+    def _merge_write(self, recs, outfile, mode, header, n):
         recs.sort(key=_by_qname)
-        merge_fn = outfile + str.format(".{:05d}.ibbr.tmp.bam", n)
-        merge_bam = pysam.AlignmentFile(merge_fn, 'wb', header=header)
+        if mode == 'wc':
+            ext = 'cram'
+        else:
+            mode = 'wb'
+            ext = 'bam'
+        merge_fn = outfile + str.format(".{:05d}.ibbr.tmp.{}", n, ext)
+        merge_bam = pysam.AlignmentFile(merge_fn, mode, header=header)
         for mrec in recs:
             merge_bam.write(mrec)
         merge_bam.close()
@@ -107,7 +148,12 @@ class IndexByReadId(object):
         n = 0
         prev_qname = ''
         prev_pos = None
-        with pysam.AlignmentFile( self.bam, "rb" ) as b_fh:
+        rmode = self._get_rmode(self.bam)
+        if rmode == 'rc':
+            raise NotImplementedError("Indexing and seeking of CRAM files is" +
+                                      " not implemented (seek not implemented"+
+                                      " by pysam)")
+        with pysam.AlignmentFile( self.bam, rmode) as b_fh:
             p = b_fh.tell()
             for r in b_fh.fetch(until_eof=True):
                 if prev_qname and r.query_name < prev_qname:
@@ -269,6 +315,9 @@ class IndexByReadId(object):
         #not found (shouldn't happen after check in _get_matching_reads)
         return (None, None) 
 
+
+class OutFormatError(Exception):
+    pass
 
 class UnsortedBamError(Exception):
     pass

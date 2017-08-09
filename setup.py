@@ -18,6 +18,7 @@ setup(
     install_requires=[
           'pysam',
       ],
+    scripts = ["bin/reads_by_id"],
     classifiers = [
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',

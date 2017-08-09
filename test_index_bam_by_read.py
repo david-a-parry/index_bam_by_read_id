@@ -2,7 +2,7 @@ from nose.tools import *
 import os
 import pysam
 from collections import OrderedDict
-from index_bam_by_read_id import *
+from index_bam_by_read_id import IndexByReadId,UnsortedBamError
 
 _f = 'test_data/test.bam'
 _s = "test_data/test_rid_sorted.bam"
@@ -84,3 +84,10 @@ def test_find_targets():
     hits = ibbr2.get_reads_by_id( #search for non-existent read
                         "NZ_GG703879.1_967999_968061_0_1_0_0_4:0:0_1:0:0_62bb")
     assert_equal(len(hits), 0)
+
+if __name__ == '__main__':
+    test_sort_input()
+    test_unsorted_error()
+    test_create_index()
+    test_read_index()
+    test_find_targets()

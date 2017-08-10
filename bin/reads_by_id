@@ -8,11 +8,19 @@ from index_bam_by_read_id import IndexByReadId
 def get_parser():
     '''Get ArgumentParser'''
     parser = argparse.ArgumentParser(
-                  description='Retrieve alignments by read ID.',)
+                  description='Retrieve SAM/BAM alignments by read ID.',
+                  add_help=False,
+                  usage='\t%(prog)s CMD BAM [options]\n\n' + 
+                        'e.g.\t%(prog)s get BAM [options]\n' +
+                        '\t%(prog)s index BAM [options]\n' +
+                        '\t%(prog)s sort BAM [options]\n',
+                  )
     parser.add_argument("CMD", metavar="COMMAND", 
                         help='''command to run. Can be one of 'sort', 'index' or 
                             'get'.''')
     parser.add_argument("BAM", metavar="BAM", help="input BAM file")
+    parser.add_argument('-h', '--help', action='help', 
+                               help='''show this help message and exit''')
     get = parser.add_argument_group('get arguments')
     index = parser.add_argument_group('index arguments')
     sort = parser.add_argument_group('sort arguments')
@@ -26,13 +34,17 @@ def get_parser():
     get.add_argument("-o", "--output", metavar="OUTPUT",
                         help='''Output filename. Default is to print to STDOUT.
                              ''')
+    get.add_argument("-H", "--sam_header", action='store_true',
+                        help='''Include header with SAM output.''')
     parser.add_argument("-F", "--out_format", metavar="FMT",
                         help='''Output format for 'get' or 'sort' commands. May 
                                 be either 'BAM', 'CRAM' or 'SAM'. Default is 
                                 SAM if outputting to STDOUT and otherwise 
                                 chosen by the extenstion of the output file. 
-                                Note that CRAM format files can not be indexed 
-                                by this program.''')
+                                Note that while CRAM format files can be
+                                created by the 'sort' or 'get' commands, CRAM 
+                                files can not be used as input for 'index' or 
+                                'get' commands.''')
     parser.add_argument("-i", "--index",  metavar="INDEX", 
                         help='''index filename. Default=<BAM>.ibbr''')
     index.add_argument("-x", "--index_chunks", metavar="N", type=int, 
@@ -57,11 +69,11 @@ def get_parser():
 
 def run(CMD, BAM, read_ids=None, read_file=None, index=None, output=None, 
         out_format=None, sorted_output=None, index_chunks=50000, 
-        batch_size=2000000, ):
+        batch_size=2000000, sam_header=False):
     ''' Dispatch appropriate command.'''
     ibbr = IndexByReadId(BAM, index=index)
     if CMD == 'get':
-        get_records(ibbr, read_ids, read_file, output, out_format)
+        get_records(ibbr, read_ids, read_file, output, out_format, sam_header)
     elif CMD == 'sort':
         ibbr.sort_bam(outfile=sorted_output, out_format=out_format,
                       batch_size=batch_size)
@@ -71,11 +83,11 @@ def run(CMD, BAM, read_ids=None, read_file=None, index=None, output=None,
         sys.exit("ERROR: Unrecognised command '{}'".format(CMD))
 
 def get_records(ibbr, read_ids=None, read_file=None, output=None, 
-                out_format=None):
+                out_format=None, sam_header=False):
     if read_ids is None and read_file is None:
         sys.exit("Either -r/--read_ids or -f/--read_file options are required"+
                  " with 'get' command.")
-    bamout = _get_output(output, out_format, ibbr.bamfile)
+    bamout = _get_output(output, out_format, ibbr.bamfile, sam_header)
     if read_ids is None:
         read_ids = set()
     else:
@@ -88,7 +100,7 @@ def get_records(ibbr, read_ids=None, read_file=None, output=None,
             bamout.write(h)
     
 
-def _get_output(output, fmt, template):
+def _get_output(output, fmt, template, include_header=False):
     wbmode = 'wb'
     if fmt is not None:
         if fmt == 'SAM':
@@ -103,11 +115,13 @@ def _get_output(output, fmt, template):
                 wbmode = 'w'
             elif output.endswith(('.cram', '.CRAM')):
                 wbmode = 'wc'
-        return pysam.AlignmentFile(output, wbmode, template=template)
+        return pysam.AlignmentFile(output, wbmode, template=template, 
+                                   add_sam_header=include_header)
     else:
         if fmt is None:
             wbmode = 'w'
-        return  pysam.AlignmentFile('-', wbmode, template=template)
+        return  pysam.AlignmentFile('-', wbmode, template=template, 
+                                    add_sam_header=include_header)
        
 def _reads_from_file(f):
     rids = set()

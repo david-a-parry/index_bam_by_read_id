@@ -68,7 +68,7 @@ def run(CMD, BAM, read_ids=None, read_file=None, index=None, output=None,
     elif CMD== 'index':
         ibbr.create_index(chunk_size=index_chunks)
     else:
-        sys.exit("ERROR: Unrecognised command '{}'".format(command))
+        sys.exit("ERROR: Unrecognised command '{}'".format(CMD))
 
 def get_records(ibbr, read_ids=None, read_file=None, output=None, 
                 out_format=None):

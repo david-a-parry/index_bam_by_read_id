@@ -61,7 +61,7 @@ class IndexByReadId(object):
         '''
         ext = '.bam'
         wmode = 'wb'
-        rmode = 'rb'
+        rmode = self._get_rmode(self.bam)
         if out_format is not None:
             if out_format == 'CRAM':
                 ext = '.cram'
@@ -121,6 +121,7 @@ class IndexByReadId(object):
                 del mergers[i] 
         sink.close()
         self.bam = outfile
+        rmode = self._get_rmode(self.bam)
         if self.bamfile.is_open():
             self.bamfile.close()
         self.bamfile = pysam.AlignmentFile(self.bam, rmode)

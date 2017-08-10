@@ -16,7 +16,7 @@ setup(
     test_suite='nose.collector',
     tests_require=['nose'],
     install_requires=[
-          'pysam',
+          'pysam>=0.11.1',
       ],
     scripts = ["bin/reads_by_id"],
     classifiers = [

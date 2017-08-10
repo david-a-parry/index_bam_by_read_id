@@ -15,9 +15,9 @@ def get_parser():
                         '\t%(prog)s index BAM [options]\n' +
                         '\t%(prog)s sort BAM [options]\n',
                   )
-    parser.add_argument("CMD", metavar="COMMAND", 
-                        help='''command to run. Can be one of 'sort', 'index' or 
-                            'get'.''')
+    parser.add_argument("CMD", metavar="CMD", 
+                        help='''command to run. Can be one of 'sort', 'index' 
+                            or 'get'.''')
     parser.add_argument("BAM", metavar="BAM", help="input BAM file")
     parser.add_argument('-h', '--help', action='help', 
                                help='''show this help message and exit''')

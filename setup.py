@@ -18,7 +18,7 @@ setup(
     install_requires=[
           'pysam>=0.11.1',
       ],
-    scripts = ["bin/reads_by_id"],
+    scripts = ["bin/bam_reads_by_id"],
     classifiers = [
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',

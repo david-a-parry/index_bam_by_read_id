@@ -2,7 +2,10 @@ from nose.tools import *
 import os
 import pysam
 from collections import OrderedDict
-from index_bam_by_read_id import IndexByReadId,UnsortedBamError
+try:
+    from index_bam_by_read_id.index_bam_by_read_id  import IndexByReadId,UnsortedBamError
+except ImportError:
+    from index_bam_by_read_id  import IndexByReadId,UnsortedBamError
 
 _f = 'test_data/test.bam'
 _s = "test_data/test_rid_sorted.bam"

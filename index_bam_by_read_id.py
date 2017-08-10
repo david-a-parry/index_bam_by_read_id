@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import pysam
 import pickle
 from collections import OrderedDict
@@ -6,7 +5,7 @@ import os
 
 _by_qname = lambda x: x.query_name
 
-__version__ = '0.1.0'
+__version__ = '0.1.8'
 
 class IndexByReadId(object):
     ''' 

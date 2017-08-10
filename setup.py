@@ -5,13 +5,14 @@ except ImportError:
 
 setup(
     name = "index_bam_by_read_id",
+    packages=[""],
     #packages=find_packages(),
-    version = "0.1.0",
+    version = "0.1.8",
     description = "Sort, index and search BAM files by read ID",
     author = "David A. Parry",
     author_email = "david.parry@ed.ac.uk",
     url = "https://github.com/gantzgraf/index_bam_by_read_id",
-    download_url = 'https://github.com/gantzgraf/index_bam_by_read_id/archive/0.1.0.tar.gz',
+    download_url = 'https://github.com/gantzgraf/index_bam_by_read_id/archive/0.1.8.tar.gz',
     license='MIT',
     test_suite='nose.collector',
     tests_require=['nose'],

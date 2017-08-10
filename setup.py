@@ -1,11 +1,11 @@
 try:
-    from setuptools import setup
+    from setuptools import setup, find_packages
 except ImportError:
     from distutils.core import setup
 
 setup(
     name = "index_bam_by_read_id",
-    packages = [""],
+    #packages=find_packages(),
     version = "0.0.3",
     description = "Sort, index and search BAM files by read ID",
     author = "David A. Parry",

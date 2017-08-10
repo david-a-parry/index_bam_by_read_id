@@ -6,6 +6,8 @@ import os
 
 _by_qname = lambda x: x.query_name
 
+__version__ = '0.1.0'
+
 class IndexByReadId(object):
     ''' 
         Class for sorting, indexing and retrieving reads from BAMs 

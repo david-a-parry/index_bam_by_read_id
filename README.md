@@ -5,7 +5,7 @@ IDs/names
 ## installation
 
 The simplest way to install the 'index_bam_by_read_id' module and the 
-'bam_reads_by_id' script. this is to use pip:
+'bam_reads_by_id' script is to use pip:
 
 
     pip install index_bam_by_read_id

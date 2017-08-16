@@ -44,7 +44,6 @@ input for the 'get' command.
 
 The index_bam_by_read_id module contains the the IndexByReadId module and two
 basic Exception classes (UnsortedBamError and OutFormatError). Documentation can
-be viewed from an interactive python session by running:
+be viewed by running:
 
-    from index_bam_by_read_id import * 
-    help(IndexByReadId)
+    pydoc index_bam_by_read_id
